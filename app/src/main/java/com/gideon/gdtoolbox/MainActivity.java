@@ -2,6 +2,7 @@ package com.gideon.gdtoolbox;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.widget.Button;
@@ -111,37 +112,42 @@ public class MainActivity extends Activity {
         btnPtt.setText("🔁  Voice-note mode: " + (Prefs.isPtt(this) ? "ON" : "OFF"));
     }
 
-    // ===== 3. Start Desktop Commander =====
+    // ===== 3. Start Desktop Commander through Termux (not root) =====
+    private static final String TERMUX_PERMISSION = "com.termux.permission.RUN_COMMAND";
     private void dcStart() {
-        log("Starting Desktop Commander…");
-        new Thread(() -> {
-            String script =
+        if (checkSelfPermission(TERMUX_PERMISSION) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{TERMUX_PERMISSION}, 2012);
+            log("Allow Termux permission, then tap Start DC again.");
+            return;
+        }
+        try {
+            String script = "export HOME=/data/data/com.termux/files/home; " +
+                "export PREFIX=/data/data/com.termux/files/usr; " +
+                "export PATH=$PREFIX/bin:/system/bin:/system/xbin; " +
                 "IDX=$(ls $HOME/.npm/_npx/*/node_modules/@wonderwhy-er/desktop-commander/dist/index.js 2>/dev/null | head -1); " +
-                "[ -z \"$IDX\" ] && { echo NO_DC; exit 1; }; " +
-                "pgrep -f \"" + DC_MATCH + "\" >/dev/null && { echo ALREADY_RUNNING; exit 0; }; " +
+                "if [ -z \"$IDX\" ]; then echo NO_DC > $HOME/gdtoolbox-dc-status.txt; exit 1; fi; " +
                 "mkdir -p $HOME/.claude-server-commander-logs; " +
-                "setsid node \"$IDX\" remote >$HOME/.claude-server-commander-logs/gdtoolbox.log 2>&1 </dev/null & " +
-                "echo STARTED";
-            RootShell.Result r = RootShell.run(termuxRootCommand(script));
-            String msg;
-            if (r.out.contains("STARTED")) msg = "✔ Desktop Commander started.";
-            else if (r.out.contains("ALREADY_RUNNING")) msg = "• Already running.";
-            else if (r.out.contains("NO_DC")) msg = "✘ DC install not found under ~/.npm/_npx.";
-            else msg = "DC start output: " + r.out;
-            runOnUiThread(() -> log(msg));
-        }).start();
+                "nohup node \"$IDX\" remote > $HOME/.claude-server-commander-logs/gdtoolbox.log 2>&1 </dev/null & " +
+                "echo START_REQUESTED > $HOME/gdtoolbox-dc-status.txt";
+            Intent i = new Intent("com.termux.RUN_COMMAND");
+            i.setClassName("com.termux", "com.termux.app.RunCommandService");
+            i.putExtra("com.termux.RUN_COMMAND_PATH", TERMUX_BASH);
+            i.putExtra("com.termux.RUN_COMMAND_ARGUMENTS", new String[]{"-c", script});
+            i.putExtra("com.termux.RUN_COMMAND_WORKDIR", TERMUX_HOME);
+            i.putExtra("com.termux.RUN_COMMAND_BACKGROUND", true);
+            startService(i);
+            log("DC launch requested through Termux. Termux requires allow-external-apps=true.");
+        } catch (Exception e) {
+            log("DC launch error: " + e.getMessage());
+        }
     }
 
     // ===== 4. Stop Desktop Commander =====
     private void dcStop() {
-        log("Stopping Desktop Commander…");
         new Thread(() -> {
-            RootShell.Result r = RootShell.run(termuxRootCommand("pkill -f \"" + DC_MATCH +
-                    "\" && echo STOPPED || echo NOT_RUNNING"));
-            String msg = r.out.contains("STOPPED") ? "✔ Desktop Commander stopped."
-                    : r.out.contains("NOT_RUNNING") ? "• It wasn't running."
-                    : "DC stop output: " + r.out;
-            runOnUiThread(() -> log(msg));
+            RootShell.Result r = RootShell.run("pkill -f '[d]esktop-commander/dist/index.js remote' && echo STOPPED || echo NOT_RUNNING");
+            runOnUiThread(() -> log(r.out.contains("STOPPED") ? "Desktop Commander stopped." :
+                r.out.contains("NOT_RUNNING") ? "Desktop Commander not running." : r.out));
         }).start();
     }
 
