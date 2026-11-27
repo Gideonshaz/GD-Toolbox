@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- LSPosed reads this to pre-tick the apps the module should be scoped to -->
-    <string-array name="xposed_scope">
-        <item>com.whatsapp</item>
-        <item>com.whatsapp.w4b</item>
-    </string-array>
-</resources>
