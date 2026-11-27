@@ -8,6 +8,8 @@
         <package android:name="ru.gavrikov.mocklocations" />
     </queries>
 
+    <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
+
     <application
         android:allowBackup="true"
         android:label="GD Toolbox"
