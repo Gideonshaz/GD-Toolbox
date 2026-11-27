@@ -19,12 +19,11 @@ jobs:
           gradle-version: '8.10'
 
       - name: Build debug APK
-        working-directory: GD-Toolbox/WaVoiceNote
         run: gradle assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: gd-toolbox-debug-apk
-          path: GD-Toolbox/WaVoiceNote/app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
